@@ -50,12 +50,14 @@ def play_tones(times, tones, play_choice, period):
     pcm.setrate(_FRAME_RATE)
     pcm.setperiodsize(int(_FRAME_RATE * period))
     
-    tstep = int(len(times) / (times[-1] / period))
     start_t = time.clock()
-    prev_note = get_nearest_note(tones[0], 0, None)
-    for i in range(1, len(times), tstep):
-        note = get_nearest_note(tones[i], tones[i - tstep], prev_note)
-        prev_note = note
+    prev_t = times[0]
+    for i in range(1, len(times)):
+        if times[i] < prev_t + period: continue
+        if times[i] > prev_t + period:
+            time.sleep(times[i] - prev_t - period)
+        prev_t = times[i]
+        note = get_nearest_note(tones[i])
         print "%-8.3f" % times[i], "%-3s" % note, "%8.0f" % _notes_to_freq[note], \
             "%-8.0f" % tones[i]
 
@@ -81,7 +83,7 @@ def get_freq_sound(freq, period):
     return wave_data * nwaves
 
 
-def get_nearest_note(freq, prev_freq, prev_note):
+def get_nearest_note(freq):
     C2_freq = 65.406
     max_err = freq * 0.01
     index = int(round(12.0 * math.log(freq / C2_freq, 2)))
@@ -100,18 +102,17 @@ def read_data(fname):
     if s.getsampwidth() != _SAMPLE_WIDTH:
         print "Sample width needs to be", _SAMPLE_WIDTH
         sys.exit(0)
-    if s.getnchannels() != _NCHANNELS:
-        print "Number channels needs to be", _NCHANNELS
-        sys.exit(0)
+    nchannels = s.getnchannels()
+    print "  Number channels", nchannels
 
     nframes = s.getnframes()
     frames = s.readframes(nframes)
     s.close()
 
     data = []
-    for i in range(0, len(frames), 2 * _NCHANNELS):
+    for i in range(0, len(frames), 2 * nchannels):
         ch_tot = 0.0
-        for c in range(_NCHANNELS):
+        for c in range(nchannels):
             ch_tot += struct.unpack("<h", frames[i + 2 * c] + frames[i + 1 + 2 * c])[0]
         data.append(ch_tot / 2)
     
@@ -123,7 +124,6 @@ def read_data(fname):
 
 def plot_wave(data):
     tot_len = len(data)
-
     t = numpy.arange(0, float(tot_len), 1)
     t = t / _FRAME_RATE
     plt.plot(t, data[:tot_len])
@@ -166,6 +166,7 @@ def get_tones_zcross(data, db_lim, max_peak_ratio):
             
     return times, tones
 
+
 def median_smooth(times, tones, smooth_interval):
     if smooth_interval > times[-1]: smooth_interval = times[-1]
     t = 0.0
@@ -183,14 +184,16 @@ def median_smooth(times, tones, smooth_interval):
         t = times[ti]
     return smooth_times, smooth_tones
 
+
 def annotate(times, tones):
-    prev_note = get_nearest_note(tones[0], 0, None)
+    prev_note = get_nearest_note(tones[0])
     for i in range(1, len(times), 35):
-        note = get_nearest_note(tones[i], tones[i - 100], prev_note)
+        if tones[i] == 0: continue
+        note = get_nearest_note(tones[i])
+        if prev_note == note: continue
         prev_note = note
         #print times[i], tones[i], note
         plt.text(times[i], tones[i] + 5, note)
-
 
     
 def main():
