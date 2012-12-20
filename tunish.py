@@ -20,6 +20,7 @@ matplotlib.rcParams['lines.markersize'] = 6
 matplotlib.rcParams['lines.markeredgewidth'] = 0
 matplotlib.rcParams['font.size'] = 10
 
+
 freq_to_notes = {}
 notes_to_freq = {}
 notes = []
