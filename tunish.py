@@ -8,102 +8,28 @@ import struct
 import matplotlib
 import argparse
 import time
-import alsaaudio
-import random
 import matplotlib.pyplot as plt
-import thread
+
+import playtones
+import notefreqs
 
 matplotlib.rcParams['lines.markersize'] = 6
 matplotlib.rcParams['lines.markeredgewidth'] = 0
 matplotlib.rcParams['font.size'] = 10
 
-_freq_to_notes = {}
-_notes_to_freq = {}
-_notes = []
-_note_sounds = {}
-
-_NCHANNELS = 2
-_SAMPLE_WIDTH = 2
 _FRAME_RATE = 44100
-
-def compute_note_freqs(period):
-    C2_freq = 65.406
-    note_freq_step = 2.0 ** (1.0 / 12) 
-    shifted_freq = C2_freq
-    i = 0
-    for octave in range(2, 7):
-        for note in ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]:
-            full_note = note + str(octave) 
-            _notes.append(full_note)
-            _freq_to_notes[shifted_freq] = full_note
-            _notes_to_freq[full_note] = shifted_freq
-            _note_sounds[full_note] = get_note_sound(full_note, period)
-            #print "%4d" % i, "%4s" % freq_notes[shifted_freq], "%.3f" % shifted_freq
-            shifted_freq *= note_freq_step
-            i += 1
-
-def play_tones(times, tones, play_choice, period):
-    print "PLAY"
-    pcm = alsaaudio.PCM(type=alsaaudio.PCM_PLAYBACK)
-    pcm.setformat(alsaaudio.PCM_FORMAT_S16_LE)
-    pcm.setchannels(_NCHANNELS)
-    pcm.setrate(_FRAME_RATE)
-    pcm.setperiodsize(int(_FRAME_RATE * period))
-    
-    start_t = time.clock()
-    prev_t = times[0]
-    for i in range(1, len(times)):
-        if times[i] < prev_t + period: continue
-        if times[i] > prev_t + period:
-            time.sleep(times[i] - prev_t - period)
-        prev_t = times[i]
-        note = get_nearest_note(tones[i])
-        print "%-8.3f" % times[i], "%-3s" % note, "%8.0f" % _notes_to_freq[note], \
-            "%-8.0f" % tones[i]
-
-        if play_choice == "a": 
-            pcm.write(get_freq_sound(tones[i], period))
-        elif play_choice == "n": 
-            pcm.write(_note_sounds[note])
-
-    
-def get_note_sound(note, period):
-    freq = _notes_to_freq[note]
-    return get_freq_sound(freq, period)
+_SAMPLE_WIDTH = 2
 
 
-def get_freq_sound(freq, period):
-    step = 2.0 * math.pi / (_FRAME_RATE / freq)
-    max_val = 2.0 * math.pi
-    wave_data = ""
-    for x in numpy.arange(0, max_val, step):
-        y = int((math.sin(x) + 1) * 32767.5)
-        for c in range(_NCHANNELS): wave_data += (chr(y & 0xff) + chr((y>>8) & 0xff))
-    nwaves = int(period * _FRAME_RATE * _NCHANNELS * _SAMPLE_WIDTH / len(wave_data))
-    return wave_data * nwaves
-
-
-def get_nearest_note(freq):
-    C2_freq = 65.406
-    max_err = freq * 0.01
-    index = int(round(12.0 * math.log(freq / C2_freq, 2)))
-    note = _notes[index]
-    if abs(freq - _notes_to_freq[note]) <= max_err: return note
-    index = int(math.floor(12.0 * math.log(freq / C2_freq, 2)))
-    return _notes[index]
-
-    
 def read_data(fname):
     start_t = time.clock()
     s = wave.open(fname)
     if s.getframerate() != _FRAME_RATE:
-        print "Frame rate needs to be", _FRAME_RATE
-        sys.exit(0)
+        sys.exit("Frame rate needs to be", _FRAME_RATE)
     if s.getsampwidth() != _SAMPLE_WIDTH:
-        print "Sample width needs to be", _SAMPLE_WIDTH
-        sys.exit(0)
+        sys.exit("Sample width needs to be", _SAMPLE_WIDTH)
     nchannels = s.getnchannels()
-    print "  Number channels", nchannels
+    print >> sys.stderr, "  Number channels", nchannels
 
     nframes = s.getnframes()
     frames = s.readframes(nframes)
@@ -116,7 +42,7 @@ def read_data(fname):
             ch_tot += struct.unpack("<h", frames[i + 2 * c] + frames[i + 1 + 2 * c])[0]
         data.append(ch_tot / 2)
     
-    print "Read", fname +",", len(data), "data points", \
+    print >> sys.stderr, "Read", fname +",", len(data), "data points", \
         "(%.1fs)" % (float(nframes) / _FRAME_RATE), "in %.1fs" % (time.clock() - start_t)
 
     return data
@@ -185,18 +111,27 @@ def median_smooth(times, tones, smooth_interval):
     return smooth_times, smooth_tones
 
 
-def annotate(times, tones):
-    prev_note = get_nearest_note(tones[0])
-    for i in range(1, len(times), 35):
+def annotate(times, tones, period):
+    note_freqs = notefreqs.NoteFreqs()
+    prev_note = None
+    for i in range(0, len(times), 1):
         if tones[i] == 0: continue
-        note = get_nearest_note(tones[i])
-        if prev_note == note: continue
+        note = note_freqs.get_nearest_note(tones[i])
+        if prev_note != note: plt.text(times[i], tones[i] + 5, note)
         prev_note = note
-        #print times[i], tones[i], note
-        plt.text(times[i], tones[i] + 5, note)
+
+def write_data(times, tones):
+    note_freqs = notefreqs.NoteFreqs()
+    for i in range(0, len(times), 1):
+        if tones[i] == 0: continue
+        note = note_freqs.get_nearest_note(tones[i])
+        print "%10.3f" % times[i], "%5s" % note, "%8.0f" % tones[i], \
+            "%8.0f" % note_freqs.get_note_freq(note)
 
     
 def main():
+    #sys.stdout = os.fdopen(sys.stdout.fileno(), "w", 0)
+
     parser = argparse.ArgumentParser(description="Find pitch in wav file.")
     parser.add_argument(dest= "fnames", metavar="file", nargs=1,
                         help="A wav file to be processed")
@@ -222,9 +157,7 @@ def main():
     
     options = parser.parse_args()
 
-    compute_note_freqs(options.period)
-
-    print "Parameters: "
+    print >> sys.stderr, "Parameters: "
     for line in parser.format_help().split("\n"):
         if line == "": continue
         line = line.strip()
@@ -233,7 +166,7 @@ def main():
         if flag == "-h": continue
         if line[len(flag) + 1:len(flag) + 2] == " ": continue
         opt = line.split()[1]
-        print " ", flag, "%-8s" % vars(options)[opt.lower()], \
+        print >> sys.stderr, " ", flag, "%-8s" % vars(options)[opt.lower()], \
             line[len(flag) + 1 + len(opt):].strip()
 
     data = read_data(options.fnames[0])
@@ -248,22 +181,20 @@ def main():
                               options.pre_smooth_wind, mode="valid")
     max_t = float(len(data)) / _FRAME_RATE
     times, tones = get_tones_zcross(data, options.db_lim, options.max_peak_ratio)
-    print "Pitch detection took %.3fs" % (time.clock() - start_t)
-    plt.ylim((0, options.max_freq))
+    print >> sys.stderr, "Pitch detection took %.3fs" % (time.clock() - start_t)
+
     if options.post_smooth_int > 0: 
         times, tones = median_smooth(times, tones, options.post_smooth_int)
+
+    plt.ylim((0, options.max_freq))
     plt.plot(times, tones, marker="*", ls='', alpha=0.5, color="red")
-    annotate(times, tones)
     # guitar frequencies
     for f in [82.4, 110.0, 146.8, 196.0, 246.9, 329.6, 1046.5]: 
         plt.axhline(y=f, color="black")
 
-    if options.print_data:
-        for i in range(0, len(times)): 
-            print "%8d" % i, "%.4f" % times[i], "%8.0f" % tones[i]
+    annotate(times, tones, options.period)
+    if options.print_data: write_data(times, tones)
 
-    if options.play != None: 
-        thread.start_new_thread(play_tones, (times, tones, options.play, options.period))
     plt.show()
 
 
