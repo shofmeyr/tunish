@@ -1,0 +1,26 @@
+for running tuxguitar with decent sound:
+
+http://www.tumblr.com/tagged/tuxguitar
+
+ Making TuxGuitar work properly in Ubuntu
+
+Are you a musician, maybe even a guitarist? Are you tired of not being able to play .gp5 and other tab files available on the Internet? Do you miss having an application like GuitarPro and PowerTab to help you compose music?
+
+Then you should give TuxGuitar a try. Maybe you’ve already installed but are having some problems with the sound. Maybe the bass drum is not loud enough. Maybe there is no sound at all. This guide will hopefully help you solve these problems. And if you’re new to TuxGuitar, it will hopefully let you completely avoid these problems.
+
+First of all, if you haven’t already done this, install TuxGuitar. Second, install the MIDI-engine and the soundfont for it to use:
+
+$ sudo apt-get install timidity fluid-soundfont-gm
+
+
+Now all the needed components are installed, and we can proceed to configure timidity (the MIDI-engine).
+
+$ sudo gedit /etc/timidity/timidity.cfg
+
+Comment the following line by adding a #-character in front the text: “source /etc/timidity/freepats.cfg”, and remove the commenting (again, the #-character) from the following line: “source /etc/timidity/fluidr3_gm.cfg”. Save the changes.
+
+Now, you have to add the MIDI-engine to your startup applications. You do this by adding the following command in the startup application manager or in the startup script of your DE: “timidity -iA -Os”.
+
+We’re almost finished now. Now it’s time to reboot your computer to check if it all works as it should. After reboot, open TuxGuitar. When TuxGuitar is ready, it should show a default file for tuning your guitar. Try to click play. If there is no sound, go to Tools -> Settings -> Sound and change MIDI port to one of the timidity-ports available. This should do the job. Try it out.
+
+I hope this guide has been a help. If so, help me spread the word. Hell, do that anyway if you like! 
