@@ -8,6 +8,7 @@ import time
 
 class NoteFreqs:
     _notes_to_freq = {}
+    _notes_to_midi = {}
     _notes = []
     _C2_FREQ = 65.406
 
@@ -20,6 +21,7 @@ class NoteFreqs:
                 full_note = note + str(octave) 
                 self._notes.append(full_note)
                 self._notes_to_freq[full_note] = shifted_freq
+                self._notes_to_midi[full_note] = i + 36
                 shifted_freq *= note_freq_step
                 i += 1
 
@@ -29,7 +31,11 @@ class NoteFreqs:
     def get_all_notes(self):
         return self._notes
 
+    def get_note_midi(self, note):
+        return self._notes_to_midi[note]
+
     def get_nearest_note(self, freq):
+        if freq < self._C2_FREQ: freq = self._C2_FREQ
         max_err = freq * 0.01
         index = int(round(12.0 * math.log(freq / self._C2_FREQ, 2)))
         note = self._notes[index]

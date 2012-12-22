@@ -111,23 +111,24 @@ def median_smooth(times, tones, smooth_interval):
     return smooth_times, smooth_tones
 
 
-def annotate(times, tones, period):
+def annotate(times, tones, period, print_data):
     note_freqs = notefreqs.NoteFreqs()
-    prev_note = None
-    for i in range(0, len(times), 1):
+    prev_note = note_freqs.get_nearest_note(tones[0])
+    prev_t = times[0]
+    prev_tone = tones[0]
+    for i in range(1, len(times)):
         if tones[i] == 0: continue
+        if times[i] < prev_t + period: continue
+        #if abs(prev_tone - tones[i]) <= 0.02: continue
         note = note_freqs.get_nearest_note(tones[i])
-        if prev_note != note: plt.text(times[i], tones[i] + 5, note)
+        if prev_note == note: continue
+        plt.text(prev_t, prev_tone + 5, prev_note)
+        if print_data:
+            print "%10.3f" % prev_t, "%5s" % prev_note, "%8.3f" % (times[i] - prev_t), \
+                "%8.0f" % prev_tone, "%8.0f" % note_freqs.get_note_freq(prev_note)
         prev_note = note
-
-def write_data(times, tones):
-    note_freqs = notefreqs.NoteFreqs()
-    for i in range(0, len(times), 1):
-        if tones[i] == 0: continue
-        note = note_freqs.get_nearest_note(tones[i])
-        print "%10.3f" % times[i], "%5s" % note, "%8.0f" % tones[i], \
-            "%8.0f" % note_freqs.get_note_freq(note)
-
+        prev_t = times[i]
+        prev_tone = tones[i]
     
 def main():
     #sys.stdout = os.fdopen(sys.stdout.fileno(), "w", 0)
@@ -150,8 +151,6 @@ def main():
     parser.add_argument("-z", type=float, dest="pre_smooth_wind", default=100, 
                         help="Pre-smoothing window (use 0 for g, 100 for v) " + \
                             "(default %(default)d)")
-    parser.add_argument("-P", dest="play", default=None,
-                        help="Play sample (a - actual, n - nearest notes)")
     parser.add_argument("-t", type=float, dest="period", default=0.1,
                         help="Output period in secs (default %(default).2f)")
     
@@ -192,8 +191,7 @@ def main():
     for f in [82.4, 110.0, 146.8, 196.0, 246.9, 329.6, 1046.5]: 
         plt.axhline(y=f, color="black")
 
-    annotate(times, tones, options.period)
-    if options.print_data: write_data(times, tones)
+    annotate(times, tones, options.period, options.print_data)
 
     plt.show()
 
