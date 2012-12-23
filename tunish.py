@@ -111,24 +111,37 @@ def median_smooth(times, tones, smooth_interval):
     return smooth_times, smooth_tones
 
 
-def annotate(times, tones, period, print_data):
+def get_note_list(times, tones, period):
     note_freqs = notefreqs.NoteFreqs()
     prev_note = note_freqs.get_nearest_note(tones[0])
     prev_t = times[0]
     prev_tone = tones[0]
+    note_times = []
+    notes = []
+    orig_tones = []
+    note_durations = []
+    note_tones = []
     for i in range(1, len(times)):
         if tones[i] == 0: continue
         if times[i] < prev_t + period: continue
         #if abs(prev_tone - tones[i]) <= 0.02: continue
         note = note_freqs.get_nearest_note(tones[i])
         if prev_note == note: continue
-        plt.text(prev_t, prev_tone + 5, prev_note)
-        if print_data:
-            print "%10.3f" % prev_t, "%5s" % prev_note, "%8.3f" % (times[i] - prev_t), \
-                "%8.0f" % prev_tone, "%8.0f" % note_freqs.get_note_freq(prev_note)
+
+        note_times.append(prev_t)
+        notes.append(prev_note)
+        orig_tones.append(prev_tone)
+        note_durations.append(times[i] - prev_t)
+        note_tones.append(note_freqs.get_note_freq(prev_note))
+
         prev_note = note
         prev_t = times[i]
         prev_tone = tones[i]
+    return note_times, notes, note_durations, orig_tones, note_tones
+
+
+#def write_to_midi(times, notes, durations):
+    
     
 def main():
     #sys.stdout = os.fdopen(sys.stdout.fileno(), "w", 0)
@@ -138,8 +151,8 @@ def main():
                         help="A wav file to be processed")
     parser.add_argument("-p", action="store_true", dest="plot_wave", default=False,
                         help="Plot wave")       
-    parser.add_argument("-o", action="store_true", dest="print_data", default=False,
-                        help="Print data")       
+    parser.add_argument("-o", action="store_true", dest="print_notes", default=False,
+                        help="Print list of notes")       
     parser.add_argument("-d", type=int, dest="db_lim", default=25,
                         help="Decibel limit for noise (default %(default)d)")
     parser.add_argument("-f", type=float, dest="max_freq", default=400, 
@@ -153,6 +166,8 @@ def main():
                             "(default %(default)d)")
     parser.add_argument("-t", type=float, dest="period", default=0.1,
                         help="Output period in secs (default %(default).2f)")
+    parser.add_argument("-m", dest="midi_file", default=None,
+                        help="Midi file to write to (default %(default)s)")
     
     options = parser.parse_args()
 
@@ -191,7 +206,17 @@ def main():
     for f in [82.4, 110.0, 146.8, 196.0, 246.9, 329.6, 1046.5]: 
         plt.axhline(y=f, color="black")
 
-    annotate(times, tones, options.period, options.print_data)
+    times, notes, durations, tones, note_tones = get_note_list(times, tones, options.period)
+
+    for i in range(len(times)):
+        plt.text(times[i], tones[i] + 5, notes[i])
+        if options.print_notes:
+            print "%10.3f" % times[i], "%5s" % notes[i], "%8.3f" % durations[i], \
+                "%8.0f" % tones[i], "%8.0f" % note_tones[i]
+    if options.print_notes: print "fin"
+    
+    if options.midi_file != None:
+        write_to_midi(times, notes, durations)
 
     plt.show()
 

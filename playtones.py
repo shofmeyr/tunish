@@ -78,7 +78,8 @@ class PlayTones:
         for x in numpy.arange(0, max_val, step):
             y = int((math.sin(x) + 1) * 32767.5)
             for c in range(self.nchannels): wave_data += (chr(y & 0xff) + chr((y>>8) & 0xff))
-        nwaves = int(self.period * self.frame_rate * self.nchannels * self.sample_width / len(wave_data))
+        nwaves = int(self.period * self.frame_rate * self.nchannels * 
+                     self.sample_width / len(wave_data))
         return wave_data * nwaves
 
 def main():
@@ -98,7 +99,9 @@ def main():
 
     prev_t = None
     while True:
+        print "\b\b\b\b\b\b\b\b\b\b",
         line = sys.stdin.readline()
+        if "fin" in line: return
         if line == "": continue
         t, note, duration, freq = line.strip().split()[0:4]
         t = float(t)
@@ -106,6 +109,7 @@ def main():
         freq = float(freq)
         if options.play == "a": play_tones.play_tone(freq, duration)
         elif options.play == "n": play_tones.play_note(note, duration)
+        print "%8.3f" % t,
 
 if __name__ == "__main__": main()
 
