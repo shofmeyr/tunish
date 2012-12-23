@@ -9,8 +9,6 @@ import matplotlib
 import argparse
 import time
 import matplotlib.pyplot as plt
-import midiutil
-import midiutil.MidiFile
 
 import playtones
 import notefreqs
@@ -142,20 +140,6 @@ def get_note_list(times, tones, period):
     return note_times, notes, note_durations, orig_tones, note_tones
 
 
-def write_to_midi(midi_fname, times, notes, durations):
-    note_freqs = notefreqs.NoteFreqs()
-    midi = midiutil.MidiFile.MIDIFile(1)
-    midi.addTrackName(0, 0, "Track")
-    tempo = 120.0
-    midi.addTempo(0, 0, tempo)
-    for i in range(len(times)):
-        midi.addNote(track=0, channel=0, pitch=note_freqs.get_note_midi(notes[i]), 
-                     time=times[i] * tempo / 60, duration=durations[i] * tempo / 60, volume=127)
-    binfile = open(midi_fname, "wb")
-    midi.writeFile(binfile)
-    binfile.close()
-
-    
 def main():
     #sys.stdout = os.fdopen(sys.stdout.fileno(), "w", 0)
 
@@ -179,8 +163,6 @@ def main():
                             "(default %(default)d)")
     parser.add_argument("-t", type=float, dest="period", default=0.125,
                         help="Output period in secs (default %(default).2f)")
-    parser.add_argument("-m", dest="midi_fname", default=None,
-                        help="Midi file to write to (default %(default)s)")
     
     options = parser.parse_args()
 
@@ -228,9 +210,6 @@ def main():
                 "%8.0f" % tones[i], "%8.0f" % note_tones[i]
     if options.print_notes: print "fin"
     
-    if options.midi_fname != None:
-        write_to_midi(options.midi_fname, times, notes, durations)
-
     plt.show()
 
 
