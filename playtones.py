@@ -86,7 +86,7 @@ def main():
     parser = argparse.ArgumentParser(description="Play notes in file. Format: float_time_in_secs note")
     parser.add_argument("-P", dest="play", default="n",
                         help="Play sample (a - actual, n - nearest notes)")
-    parser.add_argument("-t", type=float, dest="period", default=0.1,
+    parser.add_argument("-t", type=float, dest="period", default=0.125,
                         help="Output period in secs (default %(default).2f)")
     parser.add_argument("-i", type=int, dest="instrument", default=1,
                         help="Instrument  (default %(default)d)")
