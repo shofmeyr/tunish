@@ -111,9 +111,37 @@ def median_smooth(times, tones, smooth_interval):
     return smooth_times, smooth_tones
 
 
-def get_note_list(times, tones, period):
+def get_note_list(times, tones, period, err_skip_level):
+    """
+    This function takes a sequuence of tones and converts them into a string of notes.
+    The idea is to select the notes as close as possible to the tones, without 
+    changing the intervals between the tones too much, i.e. we don't want to push 
+    two tones that are close together to different notes by rounding.
+    The algorithm here is we first try to shift the tones to minimize the error, then
+    we go tone by tone, rounding to the nearest note, and dropping those tones that are 
+    too far from a note. To find the best shift, we have to try multiple shifts, measure
+    the error in each, and then select the best at the end.
+    """
     note_freqs = notefreqs.NoteFreqs()
-    prev_note = note_freqs.get_nearest_note(tones[0])
+    min_err = 10000
+    min_err_shift = 0
+    for shift in numpy.arange(1.0, 2.1, 0.1):
+        tot_err = 0.0
+        prev_t = times[0]
+        for i in range(0, len(times)):
+            if tones[i] == 0: continue
+            if times[i] < prev_t + period: continue
+            tone = tones[i] * shift
+            note, err = note_freqs.get_nearest_note(tone)
+            tot_err += err
+            prev_t = times[i]
+        tot_err /= len(times)
+        if tot_err < min_err:
+            min_err = tot_err
+            min_err_shift = shift
+            
+
+    prev_note = note_freqs.get_nearest_note(tones[0] + min_err_shift)[0]
     prev_t = times[0]
     prev_tone = tones[0]
     note_times = []
@@ -121,28 +149,28 @@ def get_note_list(times, tones, period):
     orig_tones = []
     note_durations = []
     note_tones = []
+    err_skipped = 0
     for i in range(1, len(times)):
         if tones[i] == 0: continue
         if times[i] < prev_t + period: continue
-        #if abs(prev_tone - tones[i]) <= 0.02: continue
-        note = note_freqs.get_nearest_note(tones[i])
+        note, err = note_freqs.get_nearest_note(tones[i] + min_err_shift)
         if prev_note == note: continue
-
+        if err > err_skip_level:
+            err_skipped += 1
+            continue
         note_times.append(prev_t)
         notes.append(prev_note)
         orig_tones.append(prev_tone)
         note_durations.append(times[i] - prev_t)
         note_tones.append(note_freqs.get_note_freq(prev_note))
-
         prev_note = note
         prev_t = times[i]
         prev_tone = tones[i]
+    print >>sys.stderr, "Skipped", err_skipped, "error points"
     return note_times, notes, note_durations, orig_tones, note_tones
 
 
 def main():
-    #sys.stdout = os.fdopen(sys.stdout.fileno(), "w", 0)
-
     parser = argparse.ArgumentParser(description="Find pitch in wav file.")
     parser.add_argument(dest= "fnames", metavar="file", nargs=1,
                         help="A wav file to be processed")
@@ -163,6 +191,8 @@ def main():
                             "(default %(default)d)")
     parser.add_argument("-t", type=float, dest="period", default=0.125,
                         help="Output period in secs (default %(default).2f)")
+    parser.add_argument("-e", type=float, dest="err_skip_level", default=0.02,
+                        help="Note mismatch Level at which to skip tones (default %(default).2f)")
     
     options = parser.parse_args()
 
@@ -201,7 +231,8 @@ def main():
     for f in [82.4, 110.0, 146.8, 196.0, 246.9, 329.6, 1046.5]: 
         plt.axhline(y=f, color="black")
 
-    times, notes, durations, tones, note_tones = get_note_list(times, tones, options.period)
+    times, notes, durations, tones, note_tones = get_note_list(times, tones, options.period, 
+                                                               options.err_skip_level)
 
     for i in range(len(times)):
         plt.text(times[i], tones[i] + 5, notes[i])

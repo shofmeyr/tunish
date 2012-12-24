@@ -36,12 +36,14 @@ class NoteFreqs:
 
     def get_nearest_note(self, freq):
         if freq < self._C2_FREQ: freq = self._C2_FREQ
-        max_err = freq * 0.01
         index = int(round(12.0 * math.log(freq / self._C2_FREQ, 2)))
         note = self._notes[index]
-        if abs(freq - self._notes_to_freq[note]) <= max_err: return note
-        index = int(math.floor(12.0 * math.log(freq / self._C2_FREQ, 2)))
-        return self._notes[index]
+        err = abs(self.get_note_freq(note) - freq) / freq
+        return note, err
+        #max_err = freq * 0.01
+        #if abs(freq - self._notes_to_freq[note]) <= max_err: return note
+        #index = int(math.floor(12.0 * math.log(freq / self._C2_FREQ, 2)))
+        #return self._notes[index]
 
 
 
