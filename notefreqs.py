@@ -7,43 +7,48 @@ import argparse
 import time
 
 class NoteFreqs:
-    _notes_to_freq = {}
-    _notes_to_midi = {}
-    _notes = []
-    _C2_FREQ = 65.406
-
     def __init__(self):
+        self._notes_to_freq = {}
+        self._notes_to_midi = {}
+        self._notes = []
+        self._E2_FREQ = 82.407
+
         note_freq_step = 2.0 ** (1.0 / 12) 
-        shifted_freq = self._C2_FREQ
+        shifted_freq = self._E2_FREQ
         i = 0
         for octave in range(2, 7):
-            for note in ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]:
+            if octave == 2: notes = ["E", "F", "F#", "G", "G#", "A", "A#", "B"]
+            else: notes = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
+            for note in notes:
                 full_note = note + str(octave) 
                 self._notes.append(full_note)
                 self._notes_to_freq[full_note] = shifted_freq
-                self._notes_to_midi[full_note] = i + 36
+                self._notes_to_midi[full_note] = i + 28
                 shifted_freq *= note_freq_step
                 i += 1
 
     def get_note_freq(self, note):
         return self._notes_to_freq[note]
 
+    def get_gtab_note(self, note):
+        index = self._notes.index(note)
+        if index < 15: return "%d/%d" % (int(index / 5) + 1, index % 5)
+        elif 15 <= index < 19: return "4/%d" % (index - 15)
+        elif 19 <= index < 24: return "5/%d" % (index - 19)
+        else: return "6/%d" % (index - 24)
+
     def get_all_notes(self):
         return self._notes
-
+    
     def get_note_midi(self, note):
         return self._notes_to_midi[note]
 
     def get_nearest_note(self, freq):
-        if freq < self._C2_FREQ: freq = self._C2_FREQ
-        index = int(round(12.0 * math.log(freq / self._C2_FREQ, 2)))
+        if freq < self._E2_FREQ: freq = self._E2_FREQ
+        index = int(round(12.0 * math.log(freq / self._E2_FREQ, 2)))
         note = self._notes[index]
         err = abs(self.get_note_freq(note) - freq) / freq
         return note, err
-        #max_err = freq * 0.01
-        #if abs(freq - self._notes_to_freq[note]) <= max_err: return note
-        #index = int(math.floor(12.0 * math.log(freq / self._C2_FREQ, 2)))
-        #return self._notes[index]
 
 
 

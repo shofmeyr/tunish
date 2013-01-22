@@ -12,8 +12,6 @@ import numpy
 import midiutil.MidiFile
 
 class PlayTones:
-    _note_freqs = None
-
     def __init__(self, nchannels=2, sample_width=2, frame_rate=44100, period=0.1, instrument=74):
         self.nchannels = nchannels
         self.sample_width = sample_width
@@ -49,7 +47,7 @@ class PlayTones:
             self.pcm.write(self.get_freq_sound(tone))
 
     def play_note(self, note, duration):
-        self.mixer.setvolume(100)
+        #self.mixer.setvolume(100)
         s = []
         self.synth.noteon(0, self._note_freqs.get_note_midi(note), 127)
         s = numpy.append(s, self.synth.get_samples(int(44100 * duration)))

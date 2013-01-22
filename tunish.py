@@ -16,6 +16,13 @@ import notefreqs
 matplotlib.rcParams['lines.markersize'] = 6
 matplotlib.rcParams['lines.markeredgewidth'] = 0
 matplotlib.rcParams['font.size'] = 10
+matplotlib.rcParams['grid.linestyle'] = '-'
+matplotlib.rcParams['grid.color'] = '#aaaaaa'
+matplotlib.rcParams['grid.linewidth'] = 0.5
+matplotlib.rcParams['axes.labelsize'] = 12
+matplotlib.rcParams['axes.titlesize'] = 16
+matplotlib.rcParams['figure.figsize'] = [16.8, 8.4]
+
 
 _FRAME_RATE = 44100
 _SAMPLE_WIDTH = 2
@@ -111,7 +118,7 @@ def median_smooth(times, tones, smooth_interval):
     return smooth_times, smooth_tones
 
 
-def get_note_list(times, tones, period, err_skip_level):
+def get_note_list(times, tones, period, err_skip_level, max_freq, min_freq):
     """
     This function takes a sequuence of tones and converts them into a string of notes.
     The idea is to select the notes as close as possible to the tones, without 
@@ -130,6 +137,7 @@ def get_note_list(times, tones, period, err_skip_level):
         prev_t = times[0]
         for i in range(0, len(times)):
             if tones[i] == 0: continue
+            if tones[i] > max_freq or tones[i] < min_freq: continue
             if times[i] < prev_t + period: continue
             tone = tones[i] * shift
             note, err = note_freqs.get_nearest_note(tone)
@@ -152,6 +160,7 @@ def get_note_list(times, tones, period, err_skip_level):
     err_skipped = 0
     for i in range(1, len(times)):
         if tones[i] == 0: continue
+        if tones[i] > max_freq: continue
         if times[i] < prev_t + period: continue
         note, err = note_freqs.get_nearest_note(tones[i] + min_err_shift)
         if prev_note == note: continue
@@ -166,7 +175,7 @@ def get_note_list(times, tones, period, err_skip_level):
         prev_note = note
         prev_t = times[i]
         prev_tone = tones[i]
-    print >>sys.stderr, "Skipped", err_skipped, "error points"
+    print >>sys.stderr, "Skipped", err_skipped, "error points out of", (len(notes) + err_skipped)
     return note_times, notes, note_durations, orig_tones, note_tones
 
 
@@ -180,19 +189,20 @@ def main():
                         help="Print list of notes")       
     parser.add_argument("-d", type=int, dest="db_lim", default=25,
                         help="Decibel limit for noise (default %(default)d)")
-    parser.add_argument("-f", type=float, dest="max_freq", default=400, 
-                        help="Max frequency to plot (default %(default)d)")
+    parser.add_argument("-F", type=float, dest="max_freq", default=325, 
+                        help="Max frequency for tones (default %(default)d)")
+    parser.add_argument("-f", type=float, dest="min_freq", default=90, 
+                        help="Min frequency for tones (default %(default)d)")
     parser.add_argument("-s", type=float, dest="post_smooth_int", default=0.1, 
                         help="Median-smoothing interval in secs (default %(default).2f)")
     parser.add_argument("-r", type=float, dest="max_peak_ratio", default=0.95,
                         help="Max. peak ratio (default %(default).2f)")
     parser.add_argument("-z", type=float, dest="pre_smooth_wind", default=100, 
-                        help="Pre-smoothing window (use 0 for g, 100 for v) " + \
-                            "(default %(default)d)")
+                        help="Pre-smoothing window (default %(default)d)")
     parser.add_argument("-t", type=float, dest="period", default=0.125,
                         help="Output period in secs (default %(default).2f)")
     parser.add_argument("-e", type=float, dest="err_skip_level", default=0.02,
-                        help="Note mismatch Level at which to skip tones (default %(default).2f)")
+                        help="Mismatch level for tone skip (default %(default).2f)")
     
     options = parser.parse_args()
 
@@ -225,23 +235,46 @@ def main():
     if options.post_smooth_int > 0: 
         times, tones = median_smooth(times, tones, options.post_smooth_int)
 
-    plt.ylim((0, options.max_freq))
-    plt.plot(times, tones, marker="*", ls='', alpha=0.5, color="red")
-    # guitar frequencies
-    for f in [82.4, 110.0, 146.8, 196.0, 246.9, 329.6, 1046.5]: 
-        plt.axhline(y=f, color="black")
+    plt.semilogy(times, tones, marker="o", ls='', alpha=0.5, color="red")
 
     times, notes, durations, tones, note_tones = get_note_list(times, tones, options.period, 
-                                                               options.err_skip_level)
+                                                               options.err_skip_level, 
+                                                               options.max_freq, options.min_freq)
 
-    for i in range(len(times)):
-        plt.text(times[i], tones[i] + 5, notes[i])
-        if options.print_notes:
+    note_freqs = notefreqs.NoteFreqs()
+    all_notes = note_freqs.get_all_notes()
+    all_freqs = [note_freqs.get_note_freq(note) for note in all_notes]
+    gtabs = [note_freqs.get_gtab_note(note) for note in all_notes]
+
+    for i in range(len(all_notes)):
+        if all_freqs[i] < options.min_freq - 10: continue
+        if all_freqs[i] > options.max_freq + 10: continue
+        plt.text(times[-1] + 1.1, all_freqs[i], gtabs[i], color="blue")
+                     
+    plt.yticks(all_freqs, all_notes)
+    plt.xticks(numpy.arange(0, times[-1], 1))
+    plt.axis([0, times[-1] + 1, options.min_freq - 10, options.max_freq + 10])
+    plt.grid(True, "major")
+    plt.xlabel("Time (s)")
+    plt.ylabel("Note")
+    plt.title(options.fnames[0])
+
+    if options.print_notes:
+        # notes = all_notes
+        # times = numpy.arange(0, len(notes) * 0.125, 0.125)
+        # durations = [0.125] * len(notes)
+        # tones = all_freqs
+        # note_tones = all_freqs
+
+        for i in range(len(times)):
+        #for i in range(28):
             print "%10.3f" % times[i], "%5s" % notes[i], "%8.3f" % durations[i], \
-                "%8.0f" % tones[i], "%8.0f" % note_tones[i]
-    if options.print_notes: print "fin"
-    
+                "%8.0f" % tones[i], "%8.0f" % note_tones[i], note_freqs.get_gtab_note(notes[i])
+        print "fin"
+
     plt.show()
+
+
 
 
 if __name__ == "__main__": main()
